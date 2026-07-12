@@ -1,59 +1,28 @@
 namespace CentralHub.SDK.Adapters;
 
-public class JflAdapter : ICentralAdapter
+public class JflAdapter : TcpAdapterBase
 {
-    /// <summary>Porta padrão de fábrica da central JFL Active (Ethernet), usada como heurística de detecção.</summary>
+    /// <summary>Porta padrao da central JFL Active (Ethernet), usada como heuristica de deteccao.</summary>
     public const int PortaPadrao = 8085;
 
-
-    public async Task<bool> Conectar(string ip, int porta, string usuario, string senha)
+    /// <inheritdoc/>
+    protected override Task<ConexaoResult> IdentificarAsync(
+        string ip, int porta, string usuario, string senha, long latenciaMs)
     {
-        var (sucesso, _, _) = await TcpConnectionHelper.TestarConexao(ip, porta);
-        return sucesso;
-    }
-
-    public async Task<ConexaoResult> VerificarConectividade(string ip, int porta, string usuario, string senha)
-    {
-        var (sucesso, latenciaMs, erro) = await TcpConnectionHelper.TestarConexao(ip, porta);
-
-        if (!sucesso)
-        {
-            return new ConexaoResult
-            {
-                Sucesso = false,
-                Status = "Offline",
-                LatenciaMs = latenciaMs,
-                Erro = erro
-            };
-        }
-
-        // TODO: identificar Modelo/Firmware reais via protocolo proprietario JFL.
-        return new ConexaoResult
+        // TODO: identificar Modelo e Firmware reais via protocolo JFL Active.
+        // A central JFL conecta-se como cliente TCP; o sistema deve atuar como servidor.
+        // Requer PDF oficial do protocolo JFL ou captura Wireshark para implementacao.
+        return Task.FromResult(new ConexaoResult
         {
             Sucesso = true,
             Fabricante = "JFL",
-            Modelo = "Active 20",
-            Firmware = "3.1.0",
+            Modelo = "Desconhecido",
+            Firmware = "Desconhecido",
             Status = "Online",
             LatenciaMs = latenciaMs
-        };
+        });
     }
 
-    public Task<ComandoResult> AcionarPGM(string ip, int porta, string usuario, string senha, int pgm)
-    {
-        // TODO: implementar comando real do protocolo JFL.
-        return Task.FromResult(new ComandoResult { Sucesso = true, Resultado = $"PGM {pgm} ligado" });
-    }
-
-    public Task<ComandoResult> DesligarPGM(string ip, int porta, string usuario, string senha, int pgm)
-    {
-        // TODO: implementar comando real do protocolo JFL.
-        return Task.FromResult(new ComandoResult { Sucesso = true, Resultado = $"PGM {pgm} desligado" });
-    }
-
-    public Task<ComandoResult> PulsoPGM(string ip, int porta, string usuario, string senha, int pgm, int tempoMs)
-    {
-        // TODO: implementar comando real do protocolo JFL.
-        return Task.FromResult(new ComandoResult { Sucesso = true, Resultado = $"PGM {pgm} pulso de {tempoMs}ms" });
-    }
+    // AcionarPGM / DesligarPGM / PulsoPGM: herdados de TcpAdapterBase.
+    // Retornam "Protocolo nao implementado." ate o protocolo JFL ser integrado.
 }

@@ -16,22 +16,19 @@ internal static class TcpConnectionHelper
     public static async Task<(bool sucesso, long latenciaMs, string? erro)> TestarConexao(string ip, int porta)
     {
         using var client = new TcpClient();
+        using var cts = new CancellationTokenSource(TimeoutMs);
         var cronometro = Stopwatch.StartNew();
 
         try
         {
-            var conexaoTask = client.ConnectAsync(ip, porta);
-            var timeoutTask = Task.Delay(TimeoutMs);
-
-            var completada = await Task.WhenAny(conexaoTask, timeoutTask);
+            await client.ConnectAsync(ip, porta, cts.Token);
             cronometro.Stop();
-
-            if (completada == timeoutTask || !client.Connected)
-            {
-                return (false, cronometro.ElapsedMilliseconds, "Tempo limite de conexao excedido");
-            }
-
             return (true, cronometro.ElapsedMilliseconds, null);
+        }
+        catch (OperationCanceledException)
+        {
+            cronometro.Stop();
+            return (false, cronometro.ElapsedMilliseconds, "Tempo limite de conexao excedido");
         }
         catch (Exception ex)
         {

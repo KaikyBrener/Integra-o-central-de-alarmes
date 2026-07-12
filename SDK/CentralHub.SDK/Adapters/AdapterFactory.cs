@@ -83,9 +83,14 @@ public static class AdapterFactory
             ultimoResultado = resultado;
         }
 
-        // Nenhum adapter real conseguiu conectar: mantém o comportamento
-        // de fallback para o FakeAdapter (ambiente sem hardware real).
-        var fake = Criar(FabricanteTipo.Fake);
-        return await fake.VerificarConectividade(ip, porta, usuario, senha);
+        // Nenhum adapter real conseguiu conectar.
+        // Retorna o ultimo resultado real (com erro) em vez de mascarar com o FakeAdapter.
+        // O FakeAdapter so deve ser usado quando explicitamente solicitado via Criar().
+        return ultimoResultado ?? new ConexaoResult
+        {
+            Sucesso = false,
+            Status = "Offline",
+            Erro = "Nenhum adapter conseguiu conectar na central informada."
+        };
     }
 }
