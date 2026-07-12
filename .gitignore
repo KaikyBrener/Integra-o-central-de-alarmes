@@ -1,0 +1,10 @@
+## Backend
+Backend/**/bin/
+Backend/**/obj/
+SDK/**/bin/
+SDK/**/obj/
+*.db
+
+## Frontend
+Frontend/node_modules/
+Frontend/dist/
