@@ -1,22 +1,23 @@
-## Visual Studio
+# Visual Studio
 .vs/
 .vscode/
 
-## Build
-bin/
-obj/
+# ASP.NET
+**/bin/
+**/obj/
 
-## Node
-node_modules/
+# Node
+**/node_modules/
+**/dist/
 
-## Logs
-*.log
-
-## Banco SQLite
+# SQLite
 *.db
 *.db-shm
 *.db-wal
 
-## Sistema
+# Logs
+*.log
+
+# Sistema
 .DS_Store
 Thumbs.db
