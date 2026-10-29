@@ -30,6 +30,7 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddSingleton<IAdapterResolver, AdapterResolver>();
 builder.Services.AddScoped<ConnectionService>();
 builder.Services.AddScoped<BuildingService>();
 builder.Services.AddScoped<CentralService>();
@@ -52,6 +53,7 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     context.Database.EnsureCreated();
+    DatabaseUpgrade.Aplicar(context);
 }
 
 app.UseGlobalExceptionHandling();
