@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -17,6 +19,7 @@ public class ApiFactory : WebApplicationFactory<Program>
 {
     public const string ApiKey = "chave-de-teste";
     public const string FabricanteComFalha = "Falha";
+    public const string FabricanteComSucesso = "Sucesso";
 
     // O modelo do EF é montado uma vez por processo e guarda o protector do primeiro contexto,
     // então todas as factories dos testes precisam compartilhar o mesmo provider.
@@ -92,10 +95,23 @@ public class ApiFactory : WebApplicationFactory<Program>
         }
     }
 
-    private class ResolverDeTeste : IAdapterResolver
+    /// <summary>
+    /// Mantém a regra real de resolução (inclusive a do FakeAdapter) e acrescenta dois fabricantes
+    /// que só existem nos testes: "Sucesso" (central que aceita os comandos) e "Falha" (que os recusa).
+    /// </summary>
+    private class ResolverDeTeste : AdapterResolver
     {
-        public ICentralAdapter Resolver(string? fabricante) =>
-            fabricante == FabricanteComFalha ? new AdapterComFalha() : new AdapterResolver().Resolver(fabricante);
+        public ResolverDeTeste(IConfiguration configuration, IHostEnvironment environment)
+            : base(configuration, environment)
+        {
+        }
+
+        public override ICentralAdapter? Resolver(string? fabricante) => fabricante switch
+        {
+            FabricanteComFalha => new AdapterComFalha(),
+            FabricanteComSucesso => new FakeAdapter(),
+            _ => base.Resolver(fabricante)
+        };
     }
 
     /// <summary>Adapter cuja central sempre recusa os comandos.</summary>

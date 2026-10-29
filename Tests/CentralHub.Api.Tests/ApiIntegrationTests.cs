@@ -25,7 +25,7 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         return (await resposta.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
     }
 
-    private async Task<int> CriarCentralAsync(int buildingId, string? fabricante = "Fake")
+    private async Task<int> CriarCentralAsync(int buildingId, string? fabricante = ApiFactory.FabricanteComSucesso)
     {
         var resposta = await _client.PostAsJsonAsync("/api/central", new
         {
@@ -41,7 +41,7 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         return (await resposta.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
     }
 
-    private async Task<int> CriarCentralNovaAsync(string? fabricante = "Fake") =>
+    private async Task<int> CriarCentralNovaAsync(string? fabricante = ApiFactory.FabricanteComSucesso) =>
         await CriarCentralAsync(await CriarPredioAsync(), fabricante);
 
     private Task<HttpResponseMessage> EnviarComandoAsync(object corpo) =>
@@ -91,7 +91,7 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         var buildingId = await CriarPredioAsync();
         var criar = await _client.PostAsJsonAsync("/api/central", new
         {
-            nome = "Central Sigilo", ip = "127.0.0.1", porta = 9009, usuario = "admin", senha = Senha, buildingId, fabricante = "Fake"
+            nome = "Central Sigilo", ip = "127.0.0.1", porta = 9009, usuario = "admin", senha = Senha, buildingId, fabricante = ApiFactory.FabricanteComSucesso
         });
         var corpoCriar = await criar.Content.ReadAsStringAsync();
         var id = JsonDocument.Parse(corpoCriar).RootElement.GetProperty("id").GetInt32();
@@ -126,7 +126,7 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
 
         var atualizar = await _client.PutAsJsonAsync($"/api/central/{centralId}", new
         {
-            nome = "Central Renomeada", ip = "127.0.0.1", porta = 9009, usuario = "admin", senha = "Outra-Senha-456", buildingId, fabricante = "Fake"
+            nome = "Central Renomeada", ip = "127.0.0.1", porta = 9009, usuario = "admin", senha = "Outra-Senha-456", buildingId, fabricante = ApiFactory.FabricanteComSucesso
         });
         Assert.Equal(HttpStatusCode.NoContent, atualizar.StatusCode);
 

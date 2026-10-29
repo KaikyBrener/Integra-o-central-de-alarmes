@@ -57,7 +57,11 @@ public class OperationService
             throw new BusinessException($"Central {dto.CentralId} não encontrada.", statusCode: 404);
         }
 
-        var adapter = _adapterResolver.Resolver(central.Fabricante);
+        var adapter = _adapterResolver.Resolver(central.Fabricante)
+            ?? throw new BusinessException(
+                $"A Central {central.Id} não tem fabricante reconhecido. " +
+                "Rode o teste de conexão e salve a central novamente.",
+                statusCode: 422);
 
         // Nunca logar a senha da central: apenas identificadores e o comando executado.
         _logger.LogInformation(

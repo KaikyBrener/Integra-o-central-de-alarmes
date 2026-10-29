@@ -28,14 +28,17 @@ public static class AdapterFactory
     /// Resolve o enum de fabricante a partir do texto salvo na Central
     /// (ex.: "Intelbras", "JFL"). Usado quando o fabricante já foi
     /// identificado anteriormente em um teste de conexão.
+    /// Retorna null quando o texto é vazio ou não corresponde a nenhum
+    /// fabricante conhecido; quem chama decide o que fazer nesse caso.
     /// </summary>
-    public static FabricanteTipo ResolverPorNome(string? fabricante)
+    public static FabricanteTipo? ResolverPorNome(string? fabricante)
     {
         return fabricante?.Trim().ToLowerInvariant() switch
         {
             "intelbras" => FabricanteTipo.Intelbras,
             "jfl" => FabricanteTipo.Jfl,
-            _ => FabricanteTipo.Fake
+            "fake" => FabricanteTipo.Fake,
+            _ => null
         };
     }
 

@@ -9,22 +9,19 @@ namespace CentralHub.Api.Services;
 public class ConnectionService
 {
     private readonly ILogger<ConnectionService> _logger;
-    private readonly bool _permitirFallbackFake;
+    private readonly IAdapterResolver _adapterResolver;
 
-    public ConnectionService(ILogger<ConnectionService> logger, IConfiguration configuration, IHostEnvironment environment)
+    public ConnectionService(ILogger<ConnectionService> logger, IAdapterResolver adapterResolver)
     {
         _logger = logger;
-
-        // O FakeAdapter só pode mascarar falhas de conexão em desenvolvimento e
-        // quando habilitado explicitamente (UsarAdapterFake, padrão false).
-        _permitirFallbackFake = environment.IsDevelopment() && configuration.GetValue<bool>("UsarAdapterFake");
+        _adapterResolver = adapterResolver;
     }
 
     public async Task<ConexaoResult> TestarConexao(string ip, int porta, string usuario, string senha)
     {
         _logger.LogInformation("Testando conexão com Central em {IP}:{Porta}", ip, porta);
 
-        var resultado = await AdapterFactory.DetectarEConectar(ip, porta, usuario, senha, _permitirFallbackFake);
+        var resultado = await AdapterFactory.DetectarEConectar(ip, porta, usuario, senha, _adapterResolver.PermitirFakeAdapter);
 
         if (resultado.Sucesso)
         {
