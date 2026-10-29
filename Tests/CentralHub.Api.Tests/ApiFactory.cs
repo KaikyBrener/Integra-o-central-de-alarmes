@@ -20,6 +20,12 @@ public class ApiFactory : WebApplicationFactory<Program>
     public const string ApiKey = "chave-de-teste";
     public const string FabricanteComFalha = "Falha";
     public const string FabricanteComSucesso = "Sucesso";
+    public const string FabricanteLento = "Lento";
+    public const string FabricanteQueLancaExcecao = "Quebrado";
+    public static readonly TimeSpan DelayDoAdapterLento = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>Quantas verificações do adapter lento estiveram em andamento ao mesmo tempo.</summary>
+    public ContadorDeConcorrencia Concorrencia { get; } = new();
 
     // O modelo do EF é montado uma vez por processo e guarda o protector do primeiro contexto,
     // então todas as factories dos testes precisam compartilhar o mesmo provider.
@@ -55,6 +61,7 @@ public class ApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IDataProtectionProvider>();
             services.AddSingleton(DataProtection);
 
+            services.AddSingleton(Concorrencia);
             services.RemoveAll<IAdapterResolver>();
             services.AddSingleton<IAdapterResolver, ResolverDeTeste>();
 
@@ -101,17 +108,70 @@ public class ApiFactory : WebApplicationFactory<Program>
     /// </summary>
     private class ResolverDeTeste : AdapterResolver
     {
-        public ResolverDeTeste(IConfiguration configuration, IHostEnvironment environment)
+        private readonly ContadorDeConcorrencia _concorrencia;
+
+        public ResolverDeTeste(IConfiguration configuration, IHostEnvironment environment, ContadorDeConcorrencia concorrencia)
             : base(configuration, environment)
         {
+            _concorrencia = concorrencia;
         }
 
         public override ICentralAdapter? Resolver(string? fabricante) => fabricante switch
         {
             FabricanteComFalha => new AdapterComFalha(),
             FabricanteComSucesso => new FakeAdapter(),
+            FabricanteLento => new AdapterLento(_concorrencia),
+            FabricanteQueLancaExcecao => new AdapterQueLancaExcecao(),
             _ => base.Resolver(fabricante)
         };
+    }
+
+    public class ContadorDeConcorrencia
+    {
+        private int _atual;
+        private int _maximo;
+
+        public int Maximo => Volatile.Read(ref _maximo);
+
+        public void Entrar()
+        {
+            var atual = Interlocked.Increment(ref _atual);
+            int maximo;
+            while (atual > (maximo = Volatile.Read(ref _maximo)))
+            {
+                Interlocked.CompareExchange(ref _maximo, atual, maximo);
+            }
+        }
+
+        public void Sair() => Interlocked.Decrement(ref _atual);
+    }
+
+    private class AdapterQueLancaExcecao : FakeAdapter, ICentralAdapter
+    {
+        Task<ConexaoResult> ICentralAdapter.VerificarConectividade(string ip, int porta, string usuario, string senha) =>
+            throw new InvalidOperationException("Falha simulada no adapter");
+    }
+
+    /// <summary>Adapter cuja verificação de conectividade demora, como uma central offline esperando o timeout.</summary>
+    private class AdapterLento : FakeAdapter, ICentralAdapter
+    {
+        private readonly ContadorDeConcorrencia _concorrencia;
+
+        public AdapterLento(ContadorDeConcorrencia concorrencia) => _concorrencia = concorrencia;
+
+        async Task<ConexaoResult> ICentralAdapter.VerificarConectividade(string ip, int porta, string usuario, string senha)
+        {
+            _concorrencia.Entrar();
+            try
+            {
+                await Task.Delay(DelayDoAdapterLento);
+                return await base.VerificarConectividade(ip, porta, usuario, senha);
+            }
+            finally
+            {
+                _concorrencia.Sair();
+            }
+        }
     }
 
     /// <summary>Adapter cuja central sempre recusa os comandos.</summary>
