@@ -29,7 +29,7 @@ public class ApiFactory : WebApplicationFactory<Program>
 
     // O modelo do EF é montado uma vez por processo e guarda o protector do primeiro contexto,
     // então todas as factories dos testes precisam compartilhar o mesmo provider.
-    private static readonly IDataProtectionProvider DataProtection = new EphemeralDataProtectionProvider();
+    internal static readonly IDataProtectionProvider DataProtection = new EphemeralDataProtectionProvider();
 
     private readonly string _ambiente;
     private readonly bool _usarAdapterFake;
