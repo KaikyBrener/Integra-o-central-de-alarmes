@@ -22,6 +22,9 @@ Backend/**/keys/
 Frontend/node_modules/
 Frontend/dist/
 Frontend/*.tsbuildinfo
+Frontend/.env
+Frontend/.env.*
+!Frontend/.env.example
 
 ## Logs
 *.log

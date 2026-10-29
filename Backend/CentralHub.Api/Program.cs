@@ -20,7 +20,22 @@ builder.Services.AddSwaggerGen(options =>
         Description = "API para cadastro de Prédios, Centrais de alarme e envio de comandos de PGM (Pulso, Ligar, Desligar)."
     });
 
-    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    {
+        Name = ApiKeyMiddleware.HeaderName,
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Description = "Chave de API configurada em ApiKey (variável de ambiente ou User Secrets)."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "ApiKey" } },
+            Array.Empty<string>()
+        }
+    });
+
+    var xmlFile =$"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
     {
@@ -58,6 +73,14 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Falha logo na inicialização em vez de subir uma API que recusaria todas as requisições.
+if (string.IsNullOrWhiteSpace(app.Configuration["ApiKey"]))
+{
+    throw new InvalidOperationException(
+        "Chave de API não configurada. Defina a variável de ambiente ApiKey " +
+        "ou use 'dotnet user-secrets set ApiKey <valor>' na pasta Backend/CentralHub.Api.");
+}
+
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -76,7 +99,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// A chave de API vem depois do CORS: o preflight (OPTIONS) não envia o header e é respondido pelo CORS.
 app.UseCors("AllowFrontend");
+app.UseApiKey();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
