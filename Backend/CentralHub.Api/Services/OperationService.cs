@@ -12,21 +12,25 @@ public class OperationService
 
     private readonly AppDbContext _context;
     private readonly ILogger<OperationService> _logger;
+    private readonly IAdapterResolver _adapterResolver;
 
-    public OperationService(AppDbContext context, ILogger<OperationService> logger)
+    public OperationService(AppDbContext context, ILogger<OperationService> logger, IAdapterResolver adapterResolver)
     {
         _context = context;
         _logger = logger;
+        _adapterResolver = adapterResolver;
     }
 
     private static HistoryDto ParaDto(History h) => new()
     {
         Id = h.Id,
-        Data = h.Data,
+        // O SQLite devolve DateTime sem Kind; a data é sempre gravada em UTC.
+        Data = DateTime.SpecifyKind(h.Data, DateTimeKind.Utc),
         CentralId = h.CentralId,
         CentralNome = h.Central?.Nome,
         PGM = h.PGM,
         Comando = h.Comando,
+        Sucesso = h.Sucesso,
         Resultado = h.Resultado
     };
 
@@ -35,6 +39,11 @@ public class OperationService
         if (!ComandosValidos.Contains(dto.Comando, StringComparer.OrdinalIgnoreCase))
         {
             throw new BusinessException($"Comando inválido. Valores aceitos: {string.Join(", ", ComandosValidos)}.");
+        }
+
+        if (dto.PGM <= 0)
+        {
+            throw new BusinessException("PGM deve ser maior que zero.");
         }
 
         if (dto.Comando.Equals("Pulso", StringComparison.OrdinalIgnoreCase) && dto.TempoPulsoMs <= 0)
@@ -48,7 +57,7 @@ public class OperationService
             throw new BusinessException($"Central {dto.CentralId} não encontrada.", statusCode: 404);
         }
 
-        var adapter = AdapterFactory.Criar(AdapterFactory.ResolverPorNome(central.Fabricante));
+        var adapter = _adapterResolver.Resolver(central.Fabricante);
 
         // Nunca logar a senha da central: apenas identificadores e o comando executado.
         _logger.LogInformation(
@@ -65,17 +74,25 @@ public class OperationService
 
         var history = new History
         {
-            Data = DateTime.Now,
+            Data = DateTime.UtcNow,
             CentralId = dto.CentralId,
             PGM = dto.PGM,
             Comando = dto.Comando,
+            Sucesso = resultado.Sucesso,
             Resultado = resultado.Resultado
         };
 
         _context.Histories.Add(history);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Comando registrado no histórico {HistoryId}: {Resultado}", history.Id, history.Resultado);
+        if (history.Sucesso)
+        {
+            _logger.LogInformation("Comando registrado no histórico {HistoryId}: {Resultado}", history.Id, history.Resultado);
+        }
+        else
+        {
+            _logger.LogWarning("Comando FALHOU, registrado no histórico {HistoryId}: {Resultado}", history.Id, history.Resultado);
+        }
 
         return ParaDto(history);
     }

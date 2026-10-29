@@ -28,5 +28,6 @@ public class HistoryDto
     public string? CentralNome { get; set; }
     public int PGM { get; set; }
     public string Comando { get; set; } = string.Empty;
+    public bool Sucesso { get; set; }
     public string Resultado { get; set; } = string.Empty;
 }

@@ -10,6 +10,9 @@ SDK/**/obj/
 Tests/**/bin/
 Tests/**/obj/
 
+## Chaves do Data Protection (criptografia das senhas das centrais) - nunca versionar
+Backend/**/keys/
+
 ## Banco SQLite (dados locais)
 *.db
 *.db-shm
@@ -19,6 +22,9 @@ Tests/**/obj/
 Frontend/node_modules/
 Frontend/dist/
 Frontend/*.tsbuildinfo
+Frontend/.env
+Frontend/.env.*
+!Frontend/.env.example
 
 ## Logs
 *.log
