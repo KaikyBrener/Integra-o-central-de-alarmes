@@ -1,6 +1,7 @@
 using CentralHub.Api.Data;
 using CentralHub.Api.Middleware;
 using CentralHub.Api.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -29,6 +30,14 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Chaves usadas para criptografar as senhas das centrais. Ficam em disco e NÃO devem ser
+// versionadas nem perdidas: sem elas, as senhas já gravadas não podem ser descriptografadas.
+var chavesPath = builder.Configuration["DataProtection:KeysPath"]
+    ?? Path.Combine(builder.Environment.ContentRootPath, "keys");
+builder.Services.AddDataProtection()
+    .SetApplicationName("CentralHub")
+    .PersistKeysToFileSystem(new DirectoryInfo(chavesPath));
 
 builder.Services.AddSingleton<IAdapterResolver, AdapterResolver>();
 builder.Services.AddScoped<ConnectionService>();

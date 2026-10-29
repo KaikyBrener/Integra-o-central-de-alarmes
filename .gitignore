@@ -10,6 +10,9 @@ SDK/**/obj/
 Tests/**/bin/
 Tests/**/obj/
 
+## Chaves do Data Protection (criptografia das senhas das centrais) - nunca versionar
+Backend/**/keys/
+
 ## Banco SQLite (dados locais)
 *.db
 *.db-shm
