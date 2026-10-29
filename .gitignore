@@ -1,10 +1,28 @@
-## Backend
+## Visual Studio / editores
+.vs/
+.vscode/
+
+## Backend / SDK
 Backend/**/bin/
 Backend/**/obj/
 SDK/**/bin/
 SDK/**/obj/
+Tests/**/bin/
+Tests/**/obj/
+
+## Banco SQLite (dados locais)
 *.db
+*.db-shm
+*.db-wal
 
 ## Frontend
 Frontend/node_modules/
 Frontend/dist/
+Frontend/*.tsbuildinfo
+
+## Logs
+*.log
+
+## Sistema
+.DS_Store
+Thumbs.db
