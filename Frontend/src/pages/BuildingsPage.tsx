@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api from '../services/api'
+import api, { mensagemDeErro } from '../services/api'
 import { Building } from '../types'
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -20,8 +20,8 @@ export default function BuildingsPage() {
     try {
       const response = await api.get<Building[]>('/building')
       setBuildings(response.data)
-    } catch {
-      setErro('Não foi possível carregar os prédios.')
+    } catch (e) {
+      setErro(mensagemDeErro(e, 'Não foi possível carregar os prédios.'))
     }
   }
 
@@ -52,8 +52,8 @@ export default function BuildingsPage() {
       }
       limparForm()
       carregar()
-    } catch {
-      setErro('Não foi possível salvar o prédio.')
+    } catch (e) {
+      setErro(mensagemDeErro(e, 'Não foi possível salvar o prédio.'))
     } finally {
       setCarregando(false)
     }
@@ -71,8 +71,8 @@ export default function BuildingsPage() {
     try {
       await api.delete(`/building/${id}`)
       carregar()
-    } catch {
-      setErro('Não é possível excluir um prédio que possui centrais cadastradas.')
+    } catch (e) {
+      setErro(mensagemDeErro(e, 'Não é possível excluir um prédio que possui centrais cadastradas.'))
     }
   }
 

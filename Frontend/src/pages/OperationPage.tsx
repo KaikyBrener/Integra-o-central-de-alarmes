@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api from '../services/api'
+import api, { mensagemDeErro } from '../services/api'
 import { Building, Central, History } from '../types'
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -78,8 +78,8 @@ export default function OperationPage() {
         setErro(`A central não executou o comando: ${response.data.resultado}`)
       }
       carregarHistorico()
-    } catch {
-      setErro('Não foi possível enviar o comando.')
+    } catch (e) {
+      setErro(mensagemDeErro(e, 'Não foi possível enviar o comando.'))
     } finally {
       setEnviando(false)
     }

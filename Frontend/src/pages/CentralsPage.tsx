@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import api from '../services/api'
+import api, { mensagemDeErro } from '../services/api'
 import { Building, Central, ConexaoResult } from '../types'
+import StatusChip from '../components/StatusChip'
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, TextField, Button, Stack, IconButton, Typography, MenuItem, Select,
@@ -67,8 +68,8 @@ export default function CentralsPage() {
       if (!response.data.sucesso) {
         setErro(response.data.erro || 'Não foi possível conectar à central.')
       }
-    } catch {
-      setErro('Falha ao testar a conexão com a central.')
+    } catch (e) {
+      setErro(mensagemDeErro(e, 'Falha ao testar a conexão com a central.'))
     } finally {
       setTestando(false)
     }
@@ -110,8 +111,8 @@ export default function CentralsPage() {
       }
       limparForm()
       carregar()
-    } catch {
-      setErro('Não foi possível salvar a central.')
+    } catch (e) {
+      setErro(mensagemDeErro(e, 'Não foi possível salvar a central.'))
     }
   }
 
@@ -141,8 +142,8 @@ export default function CentralsPage() {
     try {
       await api.delete(`/central/${id}`)
       carregar()
-    } catch {
-      setErro('Não foi possível excluir a central.')
+    } catch (e) {
+      setErro(mensagemDeErro(e, 'Não foi possível excluir a central.'))
     }
   }
 
@@ -217,7 +218,7 @@ export default function CentralsPage() {
                 <TableCell>{c.ip}</TableCell>
                 <TableCell>{c.fabricante}</TableCell>
                 <TableCell>{c.modelo}</TableCell>
-                <TableCell>{c.status}</TableCell>
+                <TableCell><StatusChip status={c.status} /></TableCell>
                 <TableCell align="right">
                   <IconButton onClick={() => editar(c)}><EditIcon /></IconButton>
                   <IconButton onClick={() => excluir(c.id)}><DeleteIcon /></IconButton>
