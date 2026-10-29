@@ -2,13 +2,13 @@
 
 ![CI](https://github.com/KaikyBrener/Integra-o-central-de-alarmes/actions/workflows/ci.yml/badge.svg)
 
-MVP para cadastrar e operar centrais de alarme de fabricantes diferentes (Intelbras e JFL) a partir de uma única interface. O sistema testa a conexão com cada central, identifica fabricante, modelo e firmware, envia comandos às saídas PGM e registra o histórico de cada operação.
+MVP para cadastrar centrais de alarme de fabricantes diferentes (Intelbras e JFL) e operá-las a partir de uma única interface. A arquitetura de adapters por fabricante já está pronta; a comunicação real com os protocolos proprietários ainda está em desenvolvimento (veja "Estado atual").
 
 ## Funcionalidades
 
 - Cadastro de prédios e das centrais de cada prédio (IP, porta, usuário e senha).
-- Teste de conexão com detecção automática do fabricante, mostrando modelo, firmware, status e latência.
-- Comandos de PGM: pulso, ligar e desligar, com histórico.
+- Teste de conexão TCP real (IP e porta), com latência e escolha do adapter pela porta padrão do fabricante.
+- Fluxo de comandos de PGM (pulso, ligar e desligar) com validação e histórico.
 - Verificação periódica de conectividade das centrais cadastradas (serviço em segundo plano).
 - A senha da central nunca é devolvida pela API nem registrada em log.
 
@@ -66,6 +66,12 @@ A integração contínua (GitHub Actions) compila a API e o frontend e roda os t
 5. Na tela de Operação, selecionar prédio, central e PGM.
 6. Escolher o comando (Pulso, Ligar, Desligar) e enviar.
 7. O histórico do comando é registrado e exibido na tela.
+
+## Estado atual
+
+- Os adapters da Intelbras e da JFL já fazem o teste de conectividade TCP real. Modelo e firmware ainda são valores fixos, e os comandos de PGM são **simulados** (marcados com `TODO` no código): nenhum comando é enviado à central de verdade.
+- Quando nenhum adapter real consegue conectar, a detecção cai no `FakeAdapter`, para permitir desenvolvimento sem hardware. Na prática, o teste de conexão pode indicar sucesso para um endereço que não responde.
+- Próximo passo: implementar os protocolos de cada fabricante e remover esse fallback em produção.
 
 ## Limitações do MVP
 
