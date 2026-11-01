@@ -18,6 +18,8 @@ jobs:
         run: dotnet build Backend/CentralHub.Api/CentralHub.Api.csproj -c Release
       - name: Testes do SDK
         run: dotnet test Tests/CentralHub.SDK.Tests/CentralHub.SDK.Tests.csproj -c Release
+      - name: Testes da API
+        run: dotnet test Tests/CentralHub.Api.Tests/CentralHub.Api.Tests.csproj -c Release
 
   frontend:
     name: Frontend (React)

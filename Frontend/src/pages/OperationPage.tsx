@@ -72,7 +72,11 @@ export default function OperationPage() {
         comando,
         tempoPulsoMs
       })
-      setSucesso(response.data.resultado)
+      if (response.data.sucesso) {
+        setSucesso(response.data.resultado)
+      } else {
+        setErro(`A central não executou o comando: ${response.data.resultado}`)
+      }
       carregarHistorico()
     } catch {
       setErro('Não foi possível enviar o comando.')
@@ -149,6 +153,7 @@ export default function OperationPage() {
               <TableCell>Central</TableCell>
               <TableCell>PGM</TableCell>
               <TableCell>Comando</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell>Resultado</TableCell>
             </TableRow>
           </TableHead>
@@ -159,12 +164,13 @@ export default function OperationPage() {
                 <TableCell>{centrals.find(c => c.id === h.centralId)?.nome || h.centralId}</TableCell>
                 <TableCell>{h.pgm}</TableCell>
                 <TableCell>{h.comando}</TableCell>
+                <TableCell>{h.sucesso ? 'Sucesso' : 'Falha'}</TableCell>
                 <TableCell>{h.resultado}</TableCell>
               </TableRow>
             ))}
             {history.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} align="center">Nenhum comando enviado.</TableCell>
+                <TableCell colSpan={6} align="center">Nenhum comando enviado.</TableCell>
               </TableRow>
             )}
           </TableBody>

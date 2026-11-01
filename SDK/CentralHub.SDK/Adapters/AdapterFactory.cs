@@ -44,10 +44,13 @@ public static class AdapterFactory
     /// primeiro o adapter cuja porta padrão de fábrica corresponde à porta
     /// informada (heurística baseada na documentação de cada fabricante),
     /// depois os demais adapters, na ordem, até obter uma conexão bem-sucedida.
-    /// Caso nenhum adapter real consiga conectar, retorna o resultado do
-    /// FakeAdapter (usado em ambientes de desenvolvimento/teste).
+    /// Caso nenhum adapter real consiga conectar, retorna a falha do último
+    /// adapter tentado (Sucesso = false). O FakeAdapter só é usado como
+    /// fallback quando <paramref name="permitirFallbackFake"/> é verdadeiro,
+    /// o que deve ficar restrito a desenvolvimento/teste sem hardware.
     /// </summary>
-    public static async Task<ConexaoResult> DetectarEConectar(string ip, int porta, string usuario, string senha)
+    public static async Task<ConexaoResult> DetectarEConectar(
+        string ip, int porta, string usuario, string senha, bool permitirFallbackFake = false)
     {
         var ordemTentativa = new List<FabricanteTipo>();
 
@@ -83,9 +86,13 @@ public static class AdapterFactory
             ultimoResultado = resultado;
         }
 
-        // Nenhum adapter real conseguiu conectar: mantém o comportamento
-        // de fallback para o FakeAdapter (ambiente sem hardware real).
-        var fake = Criar(FabricanteTipo.Fake);
-        return await fake.VerificarConectividade(ip, porta, usuario, senha);
+        if (permitirFallbackFake)
+        {
+            // Somente desenvolvimento: simula uma central quando nenhum adapter real conectou.
+            var fake = Criar(FabricanteTipo.Fake);
+            return await fake.VerificarConectividade(ip, porta, usuario, senha);
+        }
+
+        return ultimoResultado!;
     }
 }

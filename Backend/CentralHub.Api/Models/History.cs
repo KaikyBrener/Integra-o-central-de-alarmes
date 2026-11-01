@@ -21,6 +21,9 @@ public class History
     [MaxLength(50)]
     public string Comando { get; set; } = string.Empty;
 
+    /// <summary>Indica se a central confirmou a execução do comando.</summary>
+    public bool Sucesso { get; set; }
+
     [MaxLength(500)]
     public string Resultado { get; set; } = string.Empty;
 }
