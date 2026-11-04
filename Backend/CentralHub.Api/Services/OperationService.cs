@@ -72,18 +72,7 @@ public class OperationService
             _ => new ComandoResult { Sucesso = false, Resultado = "Comando inválido" }
         };
 
-        var history = new History
-        {
-            Data = DateTime.UtcNow,
-            CentralId = dto.CentralId,
-            PGM = dto.PGM,
-            Comando = dto.Comando,
-            Sucesso = resultado.Sucesso,
-            Resultado = resultado.Resultado
-        };
-
-        _context.Histories.Add(history);
-        await _context.SaveChangesAsync();
+        var history = await RegistrarAsync(dto.CentralId, dto.PGM, dto.Comando, resultado);
 
         if (history.Sucesso)
         {
@@ -95,6 +84,128 @@ public class OperationService
         }
 
         return ParaDto(history);
+    }
+
+    /// <summary>
+    /// Grava o resultado do comando no histórico, com o indicador de sucesso informado pela central.
+    /// </summary>
+    private async Task<History> RegistrarAsync(int centralId, int pgm, string comando, ComandoResult resultado)
+    {
+        var texto = resultado.Resultado ?? string.Empty;
+        if (texto.Length > 500) texto = texto[..500];
+
+        var history = new History
+        {
+            Data = DateTime.UtcNow,
+            CentralId = centralId,
+            PGM = pgm,
+            Comando = comando.Length > 50 ? comando[..50] : comando,
+            Sucesso = resultado.Sucesso,
+            Resultado = texto
+        };
+
+        _context.Histories.Add(history);
+        await _context.SaveChangesAsync();
+        return history;
+    }
+
+    private async Task<(Central Central, ICentralAdapter Adapter)> ObterCentralEAdapterAsync(int centralId)
+    {
+        var central = await _context.Centrals.FirstOrDefaultAsync(c => c.Id == centralId);
+        if (central == null)
+        {
+            throw new BusinessException($"Central {centralId} não encontrada.", statusCode: 404);
+        }
+
+        return (central, _adapterResolver.Resolver(central.Fabricante));
+    }
+
+    private static T ExigirRecurso<T>(ICentralAdapter adapter, Central central, string recurso) where T : class
+    {
+        return adapter as T ?? throw new BusinessException(
+            $"A central '{central.Nome}' (fabricante: {central.Fabricante ?? "não identificado"}) não suporta {recurso} neste CentralHub.");
+    }
+
+    /// <summary>Arma ou desarma uma partição.</summary>
+    public async Task<HistoryDto> AlterarParticaoAsync(ParticaoComandoDto dto)
+    {
+        var armar = dto.Acao.Equals("Armar", StringComparison.OrdinalIgnoreCase);
+        if (!armar && !dto.Acao.Equals("Desarmar", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BusinessException("Ação inválida. Valores aceitos: Armar, Desarmar.");
+        }
+
+        var (central, adapter) = await ObterCentralEAdapterAsync(dto.CentralId);
+        var particoes = ExigirRecurso<IParticaoAdapter>(adapter, central, "arme/desarme de partições");
+
+        _logger.LogInformation("Enviando {Acao} partição {Particao} para Central {CentralId} ({Fabricante})",
+            dto.Acao, dto.Particao, central.Id, central.Fabricante);
+
+        var resultado = armar
+            ? await particoes.ArmarParticao(central.IP, central.Porta, central.Usuario, central.Senha, dto.Particao)
+            : await particoes.DesarmarParticao(central.IP, central.Porta, central.Usuario, central.Senha, dto.Particao);
+
+        var history = await RegistrarAsync(central.Id, 0, $"{(armar ? "Armar" : "Desarmar")} partição {dto.Particao}", resultado);
+        return ParaDto(history);
+    }
+
+    /// <summary>Anula (bypass) ou reativa uma zona.</summary>
+    public async Task<HistoryDto> AlterarBypassAsync(BypassComandoDto dto)
+    {
+        var anular = dto.Acao.Equals("Anular", StringComparison.OrdinalIgnoreCase);
+        if (!anular && !dto.Acao.Equals("Reativar", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BusinessException("Ação inválida. Valores aceitos: Anular, Reativar.");
+        }
+
+        var (central, adapter) = await ObterCentralEAdapterAsync(dto.CentralId);
+        var zonas = ExigirRecurso<IZonaAdapter>(adapter, central, "bypass de zonas");
+
+        _logger.LogInformation("Enviando {Acao} zona {Zona} para Central {CentralId} ({Fabricante})",
+            dto.Acao, dto.Zona, central.Id, central.Fabricante);
+
+        var resultado = anular
+            ? await zonas.BypassZona(central.IP, central.Porta, central.Usuario, central.Senha, dto.Zona)
+            : await zonas.CancelarBypassZona(central.IP, central.Porta, central.Usuario, central.Senha, dto.Zona);
+
+        var history = await RegistrarAsync(central.Id, 0, $"{(anular ? "Anular" : "Reativar")} zona {dto.Zona}", resultado);
+        return ParaDto(history);
+    }
+
+    public async Task<IEnumerable<ParticaoDto>> ConsultarParticoesAsync(int centralId)
+    {
+        var (central, adapter) = await ObterCentralEAdapterAsync(centralId);
+        var particoes = ExigirRecurso<IParticaoAdapter>(adapter, central, "consulta de partições");
+
+        try
+        {
+            var lista = await particoes.ConsultarParticoes(central.IP, central.Porta, central.Usuario, central.Senha);
+            return lista.Select(p => new ParticaoDto { Numero = p.Numero, Estado = p.Estado.ToString(), EmAlarme = p.EmAlarme }).ToList();
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new BusinessException(ex.Message, statusCode: 409);
+        }
+    }
+
+    public async Task<IEnumerable<ZonaDto>> ConsultarZonasAsync(int centralId)
+    {
+        var (central, adapter) = await ObterCentralEAdapterAsync(centralId);
+        var zonas = ExigirRecurso<IZonaAdapter>(adapter, central, "consulta de zonas");
+
+        try
+        {
+            var lista = await zonas.ConsultarZonas(central.IP, central.Porta, central.Usuario, central.Senha);
+            return lista.Select(z => new ZonaDto { Numero = z.Numero, Status = z.Status.ToString(), Descricao = z.Descricao }).ToList();
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new BusinessException(ex.Message, statusCode: 409);
+        }
+        catch (NotImplementedException ex)
+        {
+            throw new BusinessException(ex.Message, statusCode: 501);
+        }
     }
 
     public async Task<IEnumerable<HistoryDto>> ObterHistoricoAsync(int? centralId)

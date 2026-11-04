@@ -1,181 +1,140 @@
 import { useEffect, useState } from 'react'
-import api from '../services/api'
-import { Building, Central, History } from '../types'
-import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, TextField, Button, Stack, Typography, MenuItem, Select,
-  InputLabel, FormControl, Alert
-} from '@mui/material'
+import { PageHeader, Vazio } from '../components/ui'
+import { useJfl } from '../context/JflContext'
+import { usePolling } from '../hooks/usePolling'
+import { centralHub, mensagemDeErro } from '../services/api'
+import type { Building, History } from '../types'
+import { confirmar, erro, esc, executarComando } from '../utils/alerts'
+import { dataHora } from '../utils/format'
+
+type Comando = 'Ligar' | 'Desligar' | 'Pulso'
 
 export default function OperationPage() {
+  const { centrais, sessoes } = useJfl()
   const [buildings, setBuildings] = useState<Building[]>([])
-  const [centrals, setCentrals] = useState<Central[]>([])
   const [history, setHistory] = useState<History[]>([])
+  const [filtroCentral, setFiltroCentral] = useState<number | ''>('')
 
   const [buildingId, setBuildingId] = useState<number | ''>('')
   const [centralId, setCentralId] = useState<number | ''>('')
   const [pgm, setPgm] = useState(1)
-  const [comando, setComando] = useState('Ligar')
+  const [comando, setComando] = useState<Comando>('Ligar')
   const [tempoPulsoMs, setTempoPulsoMs] = useState(1000)
 
-  const [erro, setErro] = useState<string | null>(null)
-  const [sucesso, setSucesso] = useState<string | null>(null)
-  const [enviando, setEnviando] = useState(false)
-
-  const carregarBuildings = async () => {
-    const response = await api.get<Building[]>('/building')
-    setBuildings(response.data)
-  }
-
-  const carregarCentrals = async () => {
-    const response = await api.get<Central[]>('/central')
-    setCentrals(response.data)
-  }
-
-  const carregarHistorico = async () => {
-    const response = await api.get<History[]>('/operation/historico')
-    setHistory(response.data)
-  }
-
   useEffect(() => {
-    carregarBuildings()
-    carregarCentrals()
-    carregarHistorico()
+    centralHub.buildings().then(setBuildings).catch(e => erro('Não foi possível carregar os prédios', e))
   }, [])
 
-  const centralsDoPredio = centrals.filter(c => c.buildingId === buildingId)
+  const carregarHistorico = async () => {
+    try {
+      setHistory(await centralHub.historico(filtroCentral || undefined))
+    } catch (e) {
+      console.warn(mensagemDeErro(e))
+    }
+  }
+  usePolling(carregarHistorico, 10000)
+  useEffect(() => { carregarHistorico() }, [filtroCentral]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const centralsDoPredio = centrais.filter(c => c.buildingId === buildingId)
+  const central = centrais.find(c => c.id === centralId)
+  const sessao = central?.fabricante?.toLowerCase() === 'jfl' ? sessoes.find(s => s.serial === central.usuario.trim()) : undefined
+  const pgmMax = sessao?.modelo.pgms ?? 16
+  const pgmInvalida = !Number.isInteger(pgm) || pgm < 1 || pgm > pgmMax
+  const pulsoInvalido = comando === 'Pulso' && (!Number.isInteger(tempoPulsoMs) || tempoPulsoMs < 1 || tempoPulsoMs > 600000)
 
   const enviar = async () => {
-    setErro(null)
-    setSucesso(null)
-
-    if (!centralId) {
-      setErro('Selecione uma Central.')
-      return
-    }
-
-    if (!pgm || pgm <= 0) {
-      setErro('Informe um PGM válido.')
-      return
-    }
-
-    if (comando === 'Pulso' && (!tempoPulsoMs || tempoPulsoMs <= 0)) {
-      setErro('Informe o Tempo do Pulso.')
-      return
-    }
-
-    setEnviando(true)
-    try {
-      const response = await api.post<History>('/operation/enviar', {
-        centralId,
-        pgm,
-        comando,
-        tempoPulsoMs
-      })
-      if (response.data.sucesso) {
-        setSucesso(response.data.resultado)
-      } else {
-        setErro(`A central não executou o comando: ${response.data.resultado}`)
-      }
-      carregarHistorico()
-    } catch {
-      setErro('Não foi possível enviar o comando.')
-    } finally {
-      setEnviando(false)
-    }
+    if (!central || pgmInvalida || pulsoInvalido) return
+    const detalhe = comando === 'Pulso' ? ` por ${tempoPulsoMs} ms` : ''
+    if (!(await confirmar(`${comando} PGM ${pgm}${detalhe}?`, `Central <strong>${esc(central.nome)}</strong>.`, 'Enviar', comando !== 'Desligar'))) return
+    await executarComando('Enviando comando...', () => centralHub.enviarPgm(central.id, pgm, comando, tempoPulsoMs))
+    carregarHistorico()
   }
 
   return (
     <div>
-      <Typography variant="h5" gutterBottom>Operação</Typography>
+      <PageHeader titulo="Comandos e histórico" icone="bi-clock-history" migalhas={[{ texto: 'Cadastros' }, { texto: 'Comandos e histórico' }]}
+        subtitulo="Envio rápido de comandos de PGM para qualquer central cadastrada e histórico de todas as operações (PGM, arme/desarme, bypass)." />
 
-      {erro && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setErro(null)}>{erro}</Alert>}
-      {sucesso && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSucesso(null)}>{sucesso}</Alert>}
-
-      <Stack spacing={2} sx={{ mb: 3, maxWidth: 500 }}>
-        <FormControl>
-          <InputLabel>Prédio</InputLabel>
-          <Select
-            label="Prédio"
-            value={buildingId}
-            onChange={e => { setBuildingId(e.target.value as number); setCentralId('') }}
-          >
-            {buildings.map(b => (
-              <MenuItem key={b.id} value={b.id}>{b.nome}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <FormControl disabled={!buildingId}>
-          <InputLabel>Central</InputLabel>
-          <Select label="Central" value={centralId} onChange={e => setCentralId(e.target.value as number)}>
-            {centralsDoPredio.map(c => (
-              <MenuItem key={c.id} value={c.id}>{c.nome}</MenuItem>
-            ))}
-            {centralsDoPredio.length === 0 && (
-              <MenuItem value="" disabled>Nenhuma central neste prédio</MenuItem>
+      <div className="card shadow-sm mb-4">
+        <div className="card-header fw-semibold">Comando de PGM</div>
+        <div className="card-body">
+          <form className="row g-3" onSubmit={e => { e.preventDefault(); enviar() }}>
+            <div className="col-md-3">
+              <label className="form-label">Prédio</label>
+              <select className="form-select" value={buildingId} onChange={e => { setBuildingId(e.target.value ? Number(e.target.value) : ''); setCentralId('') }}>
+                <option value="">Selecione...</option>
+                {buildings.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+              </select>
+            </div>
+            <div className="col-md-3">
+              <label className="form-label">Central</label>
+              <select className="form-select" value={centralId} disabled={!buildingId} onChange={e => setCentralId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">{centralsDoPredio.length ? 'Selecione...' : 'Nenhuma central neste prédio'}</option>
+                {centralsDoPredio.map(c => <option key={c.id} value={c.id}>{c.nome}{c.fabricante ? '' : ' (não identificada)'}</option>)}
+              </select>
+              {sessao && <div className="form-text">{sessao.modelo.nome}: PGM 1 a {sessao.modelo.pgms}</div>}
+              {central?.fabricante?.toLowerCase() === 'jfl' && !sessao && <div className="form-text text-warning-emphasis">Central JFL offline.</div>}
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">PGM</label>
+              <input type="number" className={`form-control ${pgmInvalida ? 'is-invalid' : ''}`} min={1} max={pgmMax} value={pgm} onChange={e => setPgm(Number(e.target.value))} />
+              <div className="invalid-feedback">De 1 a {pgmMax}.</div>
+            </div>
+            <div className="col-md-2">
+              <label className="form-label">Comando</label>
+              <select className="form-select" value={comando} onChange={e => setComando(e.target.value as Comando)}>
+                <option value="Ligar">Ligar</option>
+                <option value="Desligar">Desligar</option>
+                <option value="Pulso">Pulso</option>
+              </select>
+            </div>
+            {comando === 'Pulso' && (
+              <div className="col-md-2">
+                <label className="form-label">Pulso (ms)</label>
+                <input type="number" className={`form-control ${pulsoInvalido ? 'is-invalid' : ''}`} min={1} max={600000} value={tempoPulsoMs} onChange={e => setTempoPulsoMs(Number(e.target.value))} />
+                <div className="invalid-feedback">De 1 a 600000 ms.</div>
+              </div>
             )}
-          </Select>
-        </FormControl>
+            <div className="col-12">
+              <button type="submit" className="btn btn-primary" disabled={!central || pgmInvalida || pulsoInvalido}><i className="bi bi-send me-1" />Enviar</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
-        <TextField label="PGM" type="number" value={pgm} onChange={e => setPgm(Number(e.target.value))} />
-
-        <FormControl>
-          <InputLabel>Comando</InputLabel>
-          <Select label="Comando" value={comando} onChange={e => setComando(e.target.value)}>
-            <MenuItem value="Pulso">Pulso</MenuItem>
-            <MenuItem value="Ligar">Ligar</MenuItem>
-            <MenuItem value="Desligar">Desligar</MenuItem>
-          </Select>
-        </FormControl>
-
-        {comando === 'Pulso' && (
-          <TextField
-            label="Tempo do Pulso (ms)"
-            type="number"
-            value={tempoPulsoMs}
-            onChange={e => setTempoPulsoMs(Number(e.target.value))}
-          />
+      <div className="card shadow-sm">
+        <div className="card-header d-flex flex-wrap gap-2 align-items-center">
+          <span className="fw-semibold me-auto">Histórico</span>
+          <select className="form-select form-select-sm w-auto" value={filtroCentral} onChange={e => setFiltroCentral(e.target.value ? Number(e.target.value) : '')}>
+            <option value="">Todas as centrais</option>
+            {centrais.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+        </div>
+        {history.length === 0 ? <Vazio icone="bi-clock-history">Nenhum comando enviado.</Vazio> : (
+          <div className="table-responsive">
+            <table className="table table-sm table-hover align-middle mb-0">
+              <thead><tr><th>Data</th><th>Central</th><th>PGM</th><th>Comando</th><th>Resultado</th></tr></thead>
+              <tbody>
+                {history.map(h => {
+                  const falhou = !h.sucesso
+                  return (
+                    <tr key={h.id}>
+                      <td className="text-nowrap small">{dataHora(h.data)}</td>
+                      <td className="small">{h.centralNome ?? centrais.find(c => c.id === h.centralId)?.nome ?? h.centralId}</td>
+                      <td>{h.pgm || '—'}</td>
+                      <td>{h.comando}</td>
+                      <td className="small">
+                        <i className={`bi ${falhou ? 'bi-x-circle-fill text-danger' : 'bi-check-circle-fill text-success'} me-1`} />
+                        {h.resultado}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-
-        <Button variant="contained" onClick={enviar} disabled={!centralId || enviando}>
-          {enviando ? 'Enviando...' : 'Enviar'}
-        </Button>
-      </Stack>
-
-      <Typography variant="h6" gutterBottom>Histórico</Typography>
-
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Data</TableCell>
-              <TableCell>Central</TableCell>
-              <TableCell>PGM</TableCell>
-              <TableCell>Comando</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Resultado</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {history.map(h => (
-              <TableRow key={h.id}>
-                <TableCell>{new Date(h.data).toLocaleString()}</TableCell>
-                <TableCell>{centrals.find(c => c.id === h.centralId)?.nome || h.centralId}</TableCell>
-                <TableCell>{h.pgm}</TableCell>
-                <TableCell>{h.comando}</TableCell>
-                <TableCell>{h.sucesso ? 'Sucesso' : 'Falha'}</TableCell>
-                <TableCell>{h.resultado}</TableCell>
-              </TableRow>
-            ))}
-            {history.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} align="center">Nenhum comando enviado.</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      </div>
     </div>
   )
 }

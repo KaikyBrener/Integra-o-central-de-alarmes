@@ -22,6 +22,8 @@ public class ApiFactory : WebApplicationFactory<Program>
     // então todas as factories dos testes precisam compartilhar o mesmo provider.
     private static readonly IDataProtectionProvider DataProtection = new EphemeralDataProtectionProvider();
 
+    internal static IDataProtectionProvider CompartilharDataProtection => DataProtection;
+
     private readonly string _ambiente;
     private readonly bool _usarAdapterFake;
     private readonly string _connectionString = $"Data Source=file:centralhub_{Guid.NewGuid():N}?mode=memory&cache=shared";

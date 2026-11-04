@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Backend\CentralHub.Api\CentralHub.Api.csproj" />
+    <!-- Reaproveita o simulador de central e as capturas reais (apenas para testes de protocolo). -->
+    <ProjectReference Include="..\CentralHub.SDK.Tests\CentralHub.SDK.Tests.csproj" />
   </ItemGroup>
 
 </Project>

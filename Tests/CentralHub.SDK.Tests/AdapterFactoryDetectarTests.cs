@@ -47,21 +47,19 @@ public class AdapterFactoryDetectarTests
         Assert.Equal("Fake", resultado.Fabricante);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ComPortaAberta_ConectaPeloAdapterReal_SemUsarOFake(bool permitirFallbackFake)
+    [Fact]
+    public async Task ComPortaAbertaQueNaoFalaOProtocolo_NaoConsideraACentralIdentificada_NemUsaOFake()
     {
+        // Um host que apenas aceita TCP não é uma central: os adapters reais exigem o protocolo do fabricante.
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         try
         {
             var porta = ((IPEndPoint)listener.LocalEndpoint).Port;
 
-            var resultado = await AdapterFactory.DetectarEConectar(
-                "127.0.0.1", porta, "admin", "senha", permitirFallbackFake);
+            var resultado = await AdapterFactory.DetectarEConectar("127.0.0.1", porta, "admin", "senha");
 
-            Assert.True(resultado.Sucesso);
+            Assert.False(resultado.Sucesso);
             Assert.NotEqual("Fake", resultado.Fabricante);
         }
         finally

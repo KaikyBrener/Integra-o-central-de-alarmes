@@ -59,13 +59,18 @@ builder.Services.AddScoped<ConnectionService>();
 builder.Services.AddScoped<BuildingService>();
 builder.Services.AddScoped<CentralService>();
 builder.Services.AddScoped<OperationService>();
+builder.Services.Configure<JflOptions>(builder.Configuration.GetSection(JflOptions.Secao));
+builder.Services.AddHostedService<JflListenerService>();
 builder.Services.AddHostedService<KeepAliveService>();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        // O Vite sobe em outra porta (5174...) quando a 5173 está ocupada; aceita localhost em qualquer porta.
+        policy.SetIsOriginAllowed(origin =>
+                  Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
+                  (uri.Host == "localhost" || uri.Host == "127.0.0.1"))
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -86,6 +91,7 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     context.Database.EnsureCreated();
     DatabaseUpgrade.Aplicar(context);
+    SchemaUpdater.Aplicar(context);
 }
 
 app.UseGlobalExceptionHandling();
@@ -108,4 +114,5 @@ app.MapControllers();
 
 app.Run();
 
+// Necessario para WebApplicationFactory<Program> nos testes de integracao.
 public partial class Program { }

@@ -1,10 +1,18 @@
+using CentralHub.SDK.Adapters.Jfl;
+
 namespace CentralHub.SDK.Adapters;
 
 public enum FabricanteTipo
 {
     Fake,
     Intelbras,
-    Jfl
+    Jfl,
+
+    /// <summary>
+    /// Fabricante ainda nao identificado (central nunca testada ou nome desconhecido). Nunca e
+    /// substituido pelo FakeAdapter: qualquer operacao falha de forma explicita.
+    /// </summary>
+    NaoIdentificado
 }
 
 public static class AdapterFactory
@@ -12,6 +20,7 @@ public static class AdapterFactory
     /// <summary>
     /// Cria um adapter explicitamente, a partir de um fabricante já conhecido
     /// (por exemplo, uma Central já salva com Fabricante identificado).
+    /// O FakeAdapter só é devolvido quando explicitamente solicitado (FabricanteTipo.Fake).
     /// </summary>
     public static ICentralAdapter Criar(FabricanteTipo fabricante)
     {
@@ -20,14 +29,14 @@ public static class AdapterFactory
             FabricanteTipo.Intelbras => new IntelbrasAdapter(),
             FabricanteTipo.Jfl => new JflAdapter(),
             FabricanteTipo.Fake => new FakeAdapter(),
-            _ => new FakeAdapter()
+            _ => new NaoIdentificadoAdapter()
         };
     }
 
     /// <summary>
     /// Resolve o enum de fabricante a partir do texto salvo na Central
-    /// (ex.: "Intelbras", "JFL"). Usado quando o fabricante já foi
-    /// identificado anteriormente em um teste de conexão.
+    /// (ex.: "Intelbras", "JFL"). Texto vazio ou desconhecido resulta em
+    /// <see cref="FabricanteTipo.NaoIdentificado"/>, nunca em simulação.
     /// </summary>
     public static FabricanteTipo ResolverPorNome(string? fabricante)
     {
@@ -35,64 +44,56 @@ public static class AdapterFactory
         {
             "intelbras" => FabricanteTipo.Intelbras,
             "jfl" => FabricanteTipo.Jfl,
-            _ => FabricanteTipo.Fake
+            "fake" => FabricanteTipo.Fake,
+            _ => FabricanteTipo.NaoIdentificado
         };
     }
 
     /// <summary>
-    /// Tenta identificar automaticamente o fabricante da central, testando
-    /// primeiro o adapter cuja porta padrão de fábrica corresponde à porta
-    /// informada (heurística baseada na documentação de cada fabricante),
-    /// depois os demais adapters, na ordem, até obter uma conexão bem-sucedida.
-    /// Caso nenhum adapter real consiga conectar, retorna a falha do último
-    /// adapter tentado (Sucesso = false). O FakeAdapter só é usado como
-    /// fallback quando <paramref name="permitirFallbackFake"/> é verdadeiro,
-    /// o que deve ficar restrito a desenvolvimento/teste sem hardware.
+    /// Tenta identificar o fabricante da central.
+    ///
+    ///  - JFL: a central é quem conecta no servidor do CentralHub, então não há conexão TCP a testar.
+    ///    A central é reconhecida se já houver uma sessão JFL ativa cujo número de série seja o
+    ///    informado no campo <c>usuario</c>.
+    ///  - Intelbras: conexão TCP direta na porta informada (heurística: 9009) seguida da identificação
+    ///    ISECNet.
+    ///
+    /// Se nada identificar a central, devolve o último resultado real (com erro) — nunca o FakeAdapter.
     /// </summary>
     public static async Task<ConexaoResult> DetectarEConectar(
         string ip, int porta, string usuario, string senha, bool permitirFallbackFake = false)
     {
-        var ordemTentativa = new List<FabricanteTipo>();
-
-        if (porta == JflAdapter.PortaPadrao)
-        {
-            ordemTentativa.Add(FabricanteTipo.Jfl);
-        }
-        else if (porta == IntelbrasAdapter.PortaPadrao)
-        {
-            ordemTentativa.Add(FabricanteTipo.Intelbras);
-        }
-
-        foreach (var tipo in new[] { FabricanteTipo.Intelbras, FabricanteTipo.Jfl })
-        {
-            if (!ordemTentativa.Contains(tipo))
-            {
-                ordemTentativa.Add(tipo);
-            }
-        }
-
         ConexaoResult? ultimoResultado = null;
 
-        foreach (var tipo in ordemTentativa)
+        if (JflSessionRegistry.Default.Find(usuario) is not null)
         {
-            var adapter = Criar(tipo);
-            var resultado = await adapter.VerificarConectividade(ip, porta, usuario, senha);
-
-            if (resultado.Sucesso)
+            var jfl = await Criar(FabricanteTipo.Jfl).VerificarConectividade(ip, porta, usuario, senha);
+            if (jfl.Sucesso)
             {
-                return resultado;
+                return jfl;
             }
+            ultimoResultado = jfl;
+        }
 
-            ultimoResultado = resultado;
+        var intelbras = await Criar(FabricanteTipo.Intelbras).VerificarConectividade(ip, porta, usuario, senha);
+        if (intelbras.Sucesso)
+        {
+            return intelbras;
         }
 
         if (permitirFallbackFake)
         {
             // Somente desenvolvimento: simula uma central quando nenhum adapter real conectou.
-            var fake = Criar(FabricanteTipo.Fake);
-            return await fake.VerificarConectividade(ip, porta, usuario, senha);
+            return await Criar(FabricanteTipo.Fake).VerificarConectividade(ip, porta, usuario, senha);
         }
 
-        return ultimoResultado!;
+        return ultimoResultado ?? new ConexaoResult
+        {
+            Sucesso = false,
+            Status = "Offline",
+            LatenciaMs = intelbras.LatenciaMs,
+            Erro = $"Nenhum fabricante identificou a central. Intelbras (TCP {ip}:{porta}): {intelbras.Erro}. " +
+                   $"JFL: nenhuma central com número de série '{usuario}' está conectada ao servidor do CentralHub."
+        };
     }
 }

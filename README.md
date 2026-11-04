@@ -40,7 +40,7 @@ CentralHub/
 │                                JflAdapter, FakeAdapter e AdapterFactory)
 ├── Tests/CentralHub.SDK.Tests   Testes unitários do SDK (xUnit)
 ├── Tests/CentralHub.Api.Tests   Testes de integração da API (xUnit, WebApplicationFactory, SQLite em memória)
-└── Frontend                     React, TypeScript, Vite, Material UI, Axios e React Router
+└── Frontend                     React, TypeScript, Vite, Bootstrap 5, SweetAlert2, Axios e React Router
 ```
 
 Cada fabricante implementa a mesma interface `ICentralAdapter`, então a API trata todas as centrais do mesmo jeito. Para dar suporte a um novo fabricante, basta criar um adapter e registrá-lo no `AdapterFactory`. O `FakeAdapter` simula uma central e permite desenvolver e testar sem hardware.
@@ -108,11 +108,22 @@ A integração contínua (GitHub Actions) compila a API e o frontend e roda os t
 6. Escolher o comando (Pulso, Ligar, Desligar) e enviar.
 7. O histórico do comando é registrado e exibido na tela, com o status de sucesso ou falha.
 
+## Centrais JFL (Active 100 Bus e Active 20)
+
+O CentralHub atua como servidor de monitoramento das centrais JFL Active (a central conecta nele): recebe eventos,
+mostra o estado de partições/zonas e envia PGM, arme/desarme e bypass. Detalhes, evidências por modelo,
+limitações e checklist de validação em hardware em [docs/INTEGRACAO_JFL.md](docs/INTEGRACAO_JFL.md).
+
+Painel (Dashboard, Eventos, Logs de protocolo, Zonas, Partições, PGMs, Dispositivos, Programação): ver [docs/FRONTEND.md](docs/FRONTEND.md).
+
+Testes: `dotnet test CentralHub.sln` (capturas reais da Active 32 Duo + simulador de central; o simulador **não** é hardware).
+
+
 ## Limitações
 
-- Os protocolos reais da Intelbras e da JFL não estão implementados: modelo e firmware são fixos e os comandos de PGM são simulados e sempre retornam sucesso (veja "Estado atual").
+- O protocolo da Intelbras não está implementado: modelo e firmware são fixos e os comandos de PGM são simulados e sempre retornam sucesso. A JFL tem protocolo real (veja [docs/INTEGRACAO_JFL.md](docs/INTEGRACAO_JFL.md)), ainda sem validação em hardware.
 - A escolha do fabricante no teste de conexão é só uma heurística de porta seguida de uma conexão TCP. Qualquer host que aceite conexão na porta informada é tratado como Intelbras ou JFL.
-- Uma central salva com fabricante vazio, "Fake" ou desconhecido usa o `FakeAdapter` nos comandos e na verificação periódica, em qualquer ambiente. Nesse caso os comandos são simulados e aparecem como sucesso.
+- Uma central salva com fabricante vazio ou desconhecido usa o `NaoIdentificadoAdapter`, e qualquer operação falha de forma explícita. Só o fabricante "Fake" usa o `FakeAdapter` (comandos simulados que aparecem como sucesso).
 - A chave de API é única e compartilhada: não há usuários, perfis nem auditoria por usuário. No frontend, `VITE_API_KEY` é embutida no JavaScript entregue ao navegador, então qualquer pessoa que consiga abrir o frontend consegue ler a chave. Use apenas em rede local ou confiável e com HTTPS fora do `localhost`.
 - As chaves do Data Protection ficam em arquivos XML sem proteção adicional. Quem tiver acesso à pasta `keys` e ao banco consegue descriptografar as senhas, e quem perder a pasta `keys` perde as senhas já gravadas (é preciso recadastrá-las). Faça backup da pasta e nunca a versione.
 - Senhas gravadas antes da criptografia continuam em texto simples no banco até a central ser salva de novo.

@@ -1,0 +1,23 @@
+# Visual Studio
+.vs/
+.vscode/
+
+# ASP.NET
+**/bin/
+**/obj/
+
+# Node
+**/node_modules/
+**/dist/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db

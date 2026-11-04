@@ -11,10 +11,10 @@ public class AdapterFactoryTests
     [InlineData("  JFL ", FabricanteTipo.Jfl)]
     [InlineData("jfl", FabricanteTipo.Jfl)]
     [InlineData("Fake", FabricanteTipo.Fake)]
-    [InlineData("Desconhecido", FabricanteTipo.Fake)]
-    [InlineData("", FabricanteTipo.Fake)]
-    [InlineData(null, FabricanteTipo.Fake)]
-    public void ResolverPorNome_IgnoraMaiusculasEEspacos_ECaiNoFakeQuandoDesconhecido(string? nome, FabricanteTipo esperado)
+    [InlineData("Desconhecido", FabricanteTipo.NaoIdentificado)]
+    [InlineData("", FabricanteTipo.NaoIdentificado)]
+    [InlineData(null, FabricanteTipo.NaoIdentificado)]
+    public void ResolverPorNome_IgnoraMaiusculasEEspacos_ENaoIdentificadoQuandoDesconhecido(string? nome, FabricanteTipo esperado)
     {
         Assert.Equal(esperado, AdapterFactory.ResolverPorNome(nome));
     }

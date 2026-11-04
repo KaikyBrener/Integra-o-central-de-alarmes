@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<Central> Centrals => Set<Central>();
     public DbSet<History> Histories => Set<History>();
+    public DbSet<CentralEvent> Eventos => Set<CentralEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,6 +59,21 @@ public class AppDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(h => h.CentralId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CentralEvent>(entity =>
+        {
+            entity.ToTable("Events");
+            entity.Property(e => e.Tipo).IsRequired().HasMaxLength(30);
+            entity.Property(e => e.Descricao).HasMaxLength(500);
+            entity.HasIndex(e => e.DataHora);
+            entity.HasIndex(e => e.CentralId);
+
+            // Evento de central removida é mantido (auditoria), apenas perde o vínculo.
+            entity.HasOne(e => e.Central)
+                  .WithMany()
+                  .HasForeignKey(e => e.CentralId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }
