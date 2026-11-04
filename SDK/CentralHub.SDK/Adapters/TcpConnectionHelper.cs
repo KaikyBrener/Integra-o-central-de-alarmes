@@ -36,4 +36,29 @@ internal static class TcpConnectionHelper
             return (false, cronometro.ElapsedMilliseconds, ex.Message);
         }
     }
+
+    /// <summary>
+    /// Abre e retorna uma conexao TCP persistente, para uso em troca real de
+    /// frames de protocolo (autenticacao, comandos, respostas). Diferente de
+    /// <see cref="TestarConexao"/>, que abre e fecha na hora so para medir
+    /// conectividade/latencia. O chamador e responsavel por dar Dispose no
+    /// TcpClient retornado.
+    /// Retorna null se nao conseguir conectar dentro do timeout.
+    /// </summary>
+    public static async Task<TcpClient?> AbrirConexaoAsync(string ip, int porta, int timeoutMs = TimeoutMs)
+    {
+        var client = new TcpClient();
+        using var cts = new CancellationTokenSource(timeoutMs);
+
+        try
+        {
+            await client.ConnectAsync(ip, porta, cts.Token);
+            return client;
+        }
+        catch
+        {
+            client.Dispose();
+            return null;
+        }
+    }
 }
