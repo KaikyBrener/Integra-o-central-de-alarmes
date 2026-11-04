@@ -60,7 +60,8 @@ public static class AdapterFactory
     ///
     /// Se nada identificar a central, devolve o último resultado real (com erro) — nunca o FakeAdapter.
     /// </summary>
-    public static async Task<ConexaoResult> DetectarEConectar(string ip, int porta, string usuario, string senha)
+    public static async Task<ConexaoResult> DetectarEConectar(
+        string ip, int porta, string usuario, string senha, bool permitirFallbackFake = false)
     {
         ConexaoResult? ultimoResultado = null;
 
@@ -78,6 +79,12 @@ public static class AdapterFactory
         if (intelbras.Sucesso)
         {
             return intelbras;
+        }
+
+        if (permitirFallbackFake)
+        {
+            // Somente desenvolvimento: simula uma central quando nenhum adapter real conectou.
+            return await Criar(FabricanteTipo.Fake).VerificarConectividade(ip, porta, usuario, senha);
         }
 
         return ultimoResultado ?? new ConexaoResult

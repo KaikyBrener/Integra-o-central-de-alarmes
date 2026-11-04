@@ -1,12 +1,34 @@
-## Backend
+## Visual Studio / editores
+.vs/
+.vscode/
+
+## Backend / SDK
 Backend/**/bin/
 Backend/**/obj/
 SDK/**/bin/
 SDK/**/obj/
+Tests/**/bin/
+Tests/**/obj/
+
+## Chaves do Data Protection (criptografia das senhas das centrais) - nunca versionar
+Backend/**/keys/
+
+## Banco SQLite (dados locais)
 *.db
+*.db-shm
+*.db-wal
 
 ## Frontend
 Frontend/node_modules/
 Frontend/dist/
-Tests/**/bin/
-Tests/**/obj/
+Frontend/*.tsbuildinfo
+Frontend/.env
+Frontend/.env.*
+!Frontend/.env.example
+
+## Logs
+*.log
+
+## Sistema
+.DS_Store
+Thumbs.db

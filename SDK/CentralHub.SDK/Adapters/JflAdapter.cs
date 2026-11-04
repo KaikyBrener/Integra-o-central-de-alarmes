@@ -37,6 +37,9 @@ public class JflAdapterOptions
 /// </summary>
 public class JflAdapter : ICentralAdapter, IZonaAdapter, IParticaoAdapter
 {
+    /// <summary>Porta padrão em que o servidor JFL do CentralHub escuta as centrais.</summary>
+    public const int PortaPadrao = 9090;
+
     private readonly JflSessionRegistry _registry;
     private readonly JflAdapterOptions _options;
 

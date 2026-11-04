@@ -26,6 +26,7 @@ export interface History {
   centralNome?: string
   pgm: number
   comando: string
+  sucesso: boolean
   resultado: string
 }
 

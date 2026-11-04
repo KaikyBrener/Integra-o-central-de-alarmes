@@ -64,17 +64,17 @@ export function info(titulo: string, html: string) {
 
 /**
  * Executa um comando real na central exibindo carregamento e depois o resultado devolvido pelo
- * CentralHub. Um resultado "FALHA: ..." é exibido como erro (o CentralHub só confirma sucesso quando
+ * CentralHub. Um histórico com sucesso=false é exibido como erro (o CentralHub só confirma sucesso quando
  * o status devolvido pela central comprova a mudança).
  */
 export async function executarComando(titulo: string, acao: () => Promise<History>): Promise<boolean> {
   carregando(titulo)
   try {
     const h = await acao()
-    const falhou = h.resultado.startsWith('FALHA:')
+    const falhou = !h.sucesso
     await base.fire({
       title: falhou ? 'Comando não confirmado' : 'Comando confirmado',
-      text: falhou ? h.resultado.replace(/^FALHA:\s*/, '') : h.resultado,
+      text: h.resultado,
       icon: falhou ? 'error' : 'success',
     })
     return !falhou

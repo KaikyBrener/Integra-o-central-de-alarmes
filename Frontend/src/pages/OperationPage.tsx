@@ -116,7 +116,7 @@ export default function OperationPage() {
               <thead><tr><th>Data</th><th>Central</th><th>PGM</th><th>Comando</th><th>Resultado</th></tr></thead>
               <tbody>
                 {history.map(h => {
-                  const falhou = h.resultado.startsWith('FALHA:')
+                  const falhou = !h.sucesso
                   return (
                     <tr key={h.id}>
                       <td className="text-nowrap small">{dataHora(h.data)}</td>
@@ -125,7 +125,7 @@ export default function OperationPage() {
                       <td>{h.comando}</td>
                       <td className="small">
                         <i className={`bi ${falhou ? 'bi-x-circle-fill text-danger' : 'bi-check-circle-fill text-success'} me-1`} />
-                        {falhou ? h.resultado.replace(/^FALHA:\s*/, '') : h.resultado}
+                        {h.resultado}
                       </td>
                     </tr>
                   )

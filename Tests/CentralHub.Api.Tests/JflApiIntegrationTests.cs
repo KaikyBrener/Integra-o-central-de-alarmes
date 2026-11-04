@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
 
 namespace CentralHub.Api.Tests;
@@ -15,17 +16,31 @@ namespace CentralHub.Api.Tests;
 /// API completa (controllers, servicos, banco SQLite, servidor JFL hospedado) contra o SIMULADOR de
 /// central. Nao e hardware: valida a integracao entre as camadas do CentralHub.
 /// </summary>
-public sealed class ApiFactory : WebApplicationFactory<Program>
+public sealed class JflApiFactory : WebApplicationFactory<Program>
 {
+    public const string ApiKey = "chave-de-teste-jfl";
+
+    // O modelo do EF guarda o protector do primeiro contexto do processo; compartilha o provider com ApiFactory.
+    private static readonly Microsoft.AspNetCore.DataProtection.IDataProtectionProvider DataProtection = ApiFactory.CompartilharDataProtection;
+
     public string DbPath { get; } = Path.Combine(Path.GetTempPath(), $"centralhub-test-{Guid.NewGuid():N}.db");
 
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={DbPath}");
+        builder.UseSetting("ApiKey", ApiKey);
         builder.UseSetting("Jfl:Port", "0");
         builder.UseSetting("Jfl:BindAddress", "127.0.0.1");
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
+            services.AddSingleton(DataProtection);
+        });
     }
+
+    protected override void ConfigureClient(HttpClient client) =>
+        client.DefaultRequestHeaders.Add("X-Api-Key", ApiKey);
 
     protected override void Dispose(bool disposing)
     {
@@ -38,11 +53,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     }
 }
 
-public class JflApiIntegrationTests : IClassFixture<ApiFactory>
+public class JflApiIntegrationTests : IClassFixture<JflApiFactory>
 {
-    private readonly ApiFactory _factory;
+    private readonly JflApiFactory _factory;
 
-    public JflApiIntegrationTests(ApiFactory factory) => _factory = factory;
+    public JflApiIntegrationTests(JflApiFactory factory) => _factory = factory;
 
     private static async Task<int> PortAsync(HttpClient client)
     {
@@ -102,14 +117,14 @@ public class JflApiIntegrationTests : IClassFixture<ApiFactory>
 
         var desligar = await PostAsync(client, "/api/operation/enviar", new { centralId, pgm = 3, comando = "Desligar" });
         Assert.Equal(0, sim.PgmState);
-        Assert.DoesNotContain("FALHA", desligar.GetProperty("resultado").GetString());
+        Assert.True(desligar.GetProperty("sucesso").GetBoolean());
 
         var pulso = await PostAsync(client, "/api/operation/enviar", new { centralId, pgm = 2, comando = "Pulso", tempoPulsoMs = 100 });
         Assert.Contains("pulso de 100 ms", pulso.GetProperty("resultado").GetString());
 
         // 4) Falha real fica marcada no histórico (nunca parece sucesso)
         var invalida = await PostAsync(client, "/api/operation/enviar", new { centralId, pgm = 17, comando = "Ligar" });
-        Assert.StartsWith("FALHA:", invalida.GetProperty("resultado").GetString());
+        Assert.False(invalida.GetProperty("sucesso").GetBoolean());
 
         // 5) Particoes, zonas, arme e bypass
         var particoes = await client.GetFromJsonAsync<JsonElement>($"/api/operation/particoes/{centralId}");
@@ -122,7 +137,7 @@ public class JflApiIntegrationTests : IClassFixture<ApiFactory>
         Assert.Equal(0x02, sim.Partitions[3]);
 
         var bypass = await PostAsync(client, "/api/operation/bypass", new { centralId, zona = 9, acao = "Anular" });
-        Assert.DoesNotContain("FALHA", bypass.GetProperty("resultado").GetString());
+        Assert.True(bypass.GetProperty("sucesso").GetBoolean());
         Assert.Contains(9, sim.Bypassed);
 
         // 6) Evento recebido da central é confirmado, persistido e vinculado à Central cadastrada
@@ -204,7 +219,7 @@ public class JflApiIntegrationTests : IClassFixture<ApiFactory>
             new { centralId = central.GetProperty("id").GetInt32(), pgm = 1, comando = "Ligar" });
 
         var texto = r.GetProperty("resultado").GetString();
-        Assert.StartsWith("FALHA:", texto);
+        Assert.False(r.GetProperty("sucesso").GetBoolean());
         Assert.Contains("nao identificado", texto!.Replace("não", "nao"));
     }
 
@@ -225,7 +240,7 @@ public class JflApiIntegrationTests : IClassFixture<ApiFactory>
             new { centralId = central.GetProperty("id").GetInt32(), pgm = 1, comando = "Ligar" });
 
         var texto = r.GetProperty("resultado").GetString()!;
-        Assert.StartsWith("FALHA:", texto);
+        Assert.False(r.GetProperty("sucesso").GetBoolean());
         Assert.Contains("702/703", texto);
     }
 
@@ -237,7 +252,7 @@ public class JflApiIntegrationTests : IClassFixture<ApiFactory>
         {
             var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite($"Data Source={path}").Options;
 
-            await using (var ctx = new AppDbContext(options))
+            await using (var ctx = new AppDbContext(options, ApiFactory.CompartilharDataProtection))
             {
                 ctx.Database.EnsureCreated();
                 ctx.Buildings.Add(new CentralHub.Api.Models.Building { Nome = "Antigo" });
@@ -245,7 +260,7 @@ public class JflApiIntegrationTests : IClassFixture<ApiFactory>
                 ctx.Database.ExecuteSqlRaw("DROP TABLE \"Events\";"); // banco criado antes do suporte a eventos
             }
 
-            await using (var ctx = new AppDbContext(options))
+            await using (var ctx = new AppDbContext(options, ApiFactory.CompartilharDataProtection))
             {
                 SchemaUpdater.Aplicar(ctx);
                 SchemaUpdater.Aplicar(ctx); // idempotente

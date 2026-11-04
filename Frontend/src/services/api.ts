@@ -7,8 +7,13 @@ import type {
 /** URL da API; padrão http://localhost:5000/api, sobrescrevível com VITE_API_URL (ex.: no .env.local). */
 export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api'
 
+// A chave vem de VITE_API_KEY (Frontend/.env.local) e deve ser igual à ApiKey configurada na API.
+// Atenção: variáveis VITE_* são embutidas no JavaScript entregue ao navegador.
+const apiKey = import.meta.env.VITE_API_KEY
+
 const api = axios.create({
   baseURL: API_URL,
+  headers: apiKey ? { 'X-Api-Key': apiKey } : {},
 })
 
 export default api
