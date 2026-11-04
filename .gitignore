@@ -8,3 +8,5 @@ SDK/**/obj/
 ## Frontend
 Frontend/node_modules/
 Frontend/dist/
+Tests/**/bin/
+Tests/**/obj/
